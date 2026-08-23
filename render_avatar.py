@@ -9,6 +9,7 @@ Expected assets (by default beside the avatar):
     avatar.png
     mouth_neutral.png
     mouth_A.png
+    mouth_E.png
     mouth_I.png
     mouth_O.png
     mouth_U.png
@@ -34,17 +35,16 @@ from PIL import Image
 MOUTH_FILES = {
     "neutral": "mouth_neutral.png",
     "A": "mouth_A.png",
+    "E": "mouth_E.png",
     "I": "mouth_I.png",
     "O": "mouth_O.png",
     "U": "mouth_U.png",
 }
 
-# With only A/I/O/U assets available, E is approximated by I. German umlauts
-# are mapped to the visually closest available shape.
 CHAR_TO_MOUTH = {
     **{c: "A" for c in "aAäÄàÀáÁâÂåÅ"},
+    **{c: "E" for c in "eEéÉèÈêÊëË"},
     **{c: "I" for c in "iIyYïÏîÎìÌíÍ"},
-    **{c: "I" for c in "eEéÉèÈêÊëË"},
     **{c: "O" for c in "oOöÖòÒóÓôÔõÕøØ"},
     **{c: "U" for c in "uUüÜùÙúÚûÛ"},
 }
