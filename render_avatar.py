@@ -5,7 +5,7 @@ No video/image generation model is used. The animation is made by compositing
 pre-rendered transparent mouth PNGs onto a transparent avatar PNG and encoding
 the resulting frames with FFmpeg.
 
-Expected assets (by default in ./assets):
+Expected assets (by default beside the avatar):
     avatar.png
     mouth_neutral.png
     mouth_A.png
@@ -43,7 +43,7 @@ MOUTH_FILES = {
 # are mapped to the visually closest available shape.
 CHAR_TO_MOUTH = {
     **{c: "A" for c in "aAäÄàÀáÁâÂåÅ"},
-    **{c: "I" for c in "iIyYIïÏîÎìÌíÍ"},
+    **{c: "I" for c in "iIyYïÏîÎìÌíÍ"},
     **{c: "I" for c in "eEéÉèÈêÊëË"},
     **{c: "O" for c in "oOöÖòÒóÓôÔõÕøØ"},
     **{c: "U" for c in "uUüÜùÙúÚûÛ"},
@@ -104,7 +104,6 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def extract_alignment(data: dict[str, Any]) -> dict[str, Any]:
-    # Accept either the full ElevenLabs response or the alignment object itself.
     alignment = data.get("alignment")
     if isinstance(alignment, dict):
         return alignment
@@ -150,8 +149,6 @@ def sample_events(
     minimum_hold: float,
     last_mouth: str,
 ) -> str:
-    # Prefer the event that covers the frame. When between events, keep the
-    # previous vowel very briefly to avoid a visible one-frame flicker.
     for start, end, mouth in events:
         if start <= frame_time < end:
             return mouth
@@ -254,22 +251,24 @@ def render(args: argparse.Namespace) -> None:
     bg_rgba = None if background.lower() == "transparent" else parse_hex_color(background)
 
     last_mouth = "neutral"
-    for index in range(frame_count):
-        t = index / args.fps
-        mouth_name = sample_events(events, t, args.hold, last_mouth)
-        last_mouth = mouth_name
+    try:
+        for index in range(frame_count):
+            t = index / args.fps
+            mouth_name = sample_events(events, t, args.hold, last_mouth)
+            last_mouth = mouth_name
 
-        if bg_rgba is None:
-            frame = Image.new("RGBA", avatar.size, (0, 0, 0, 0))
-        else:
-            frame = Image.new("RGBA", avatar.size, bg_rgba)
+            if bg_rgba is None:
+                frame = Image.new("RGBA", avatar.size, (0, 0, 0, 0))
+            else:
+                frame = Image.new("RGBA", avatar.size, bg_rgba)
 
-        frame.alpha_composite(avatar)
-        frame.alpha_composite(mouth_images.get(mouth_name, mouth_images["neutral"]))
-        frame.convert("RGB").save(frames_dir / f"frame_{index + 1:06d}.png", quality=95)
+            frame.alpha_composite(avatar)
+            frame.alpha_composite(mouth_images.get(mouth_name, mouth_images["neutral"]))
+            frame.convert("RGB").save(frames_dir / f"frame_{index + 1:06d}.png")
 
-    encode_mp4(frames_dir, audio, output, args.fps)
-    shutil.rmtree(frames_dir, ignore_errors=True)
+        encode_mp4(frames_dir, audio, output, args.fps)
+    finally:
+        shutil.rmtree(frames_dir, ignore_errors=True)
 
     print(f"Rendered: {output}")
     print(f"Duration: {duration:.3f}s")
@@ -283,7 +282,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--audio", required=True, help="Input MP3/WAV/M4A audio file")
     parser.add_argument("--alignment", required=True, help="ElevenLabs alignment JSON file")
-    parser.add_argument("--avatar", default="assets/avatar.png", help="Avatar PNG (default: assets/avatar.png)")
+    parser.add_argument("--avatar", default="avatar.png", help="Avatar PNG (default: avatar.png)")
     parser.add_argument("--output", default="output/avatar.mp4", help="Output MP4 path")
     parser.add_argument("--fps", type=int, default=30, help="Output frame rate (default: 30)")
     parser.add_argument(
