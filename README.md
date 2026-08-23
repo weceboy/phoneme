@@ -12,19 +12,18 @@ ElevenLabs currently exposes a `POST /v1/text-to-speech/:voice_id/with-timestamp
 
 ## Assets
 
-Put these files in `assets/` and make all six PNGs use the **exact same canvas size and mouth position**:
+Put these files in the repository root (or pass a different avatar path):
 
 ```text
-assets/
-├── avatar.png
-├── mouth_neutral.png
-├── mouth_A.png
-├── mouth_I.png
-├── mouth_O.png
-└── mouth_U.png
+avatar.png
+mouth_neutral.png
+mouth_A.png
+mouth_I.png
+mouth_O.png
+mouth_U.png
 ```
 
-The mouth PNGs should normally be transparent full-canvas images containing only the mouth pixels. `render_avatar.py` overlays them directly over `avatar.png`.
+The mouth PNGs should be transparent images with the **exact same canvas size and mouth position** as `avatar.png`. The renderer overlays them directly over the avatar.
 
 ## Install
 
@@ -45,9 +44,9 @@ sudo apt-get update
 sudo apt-get install -y ffmpeg
 ```
 
-## Input alignment JSON
+## Option A: You already have an MP3
 
-The renderer accepts either the full ElevenLabs `with-timestamps` response or just its `alignment` object.
+Your ElevenLabs step should also save the timestamp response as `alignment.json`. The renderer accepts either the full response or just the `alignment` object.
 
 Example:
 
@@ -61,27 +60,47 @@ Example:
 }
 ```
 
-## Render
+Render:
 
 ```bash
 python render_avatar.py \
-  --audio input/audio.mp3 \
-  --alignment input/alignment.json \
-  --avatar assets/avatar.png \
+  --audio audio.mp3 \
+  --alignment alignment.json \
+  --avatar avatar.png \
   --output output/avatar.mp4
 ```
 
 The default is 30 FPS and a black background.
 
-For a different background:
+## Option B: Let this repository create the TTS + timing
+
+Set your credentials:
+
+```bash
+export ELEVENLABS_API_KEY="..."
+export ELEVENLABS_VOICE_ID="..."
+```
+
+Then:
+
+```bash
+python elevenlabs_tts.py \
+  --text "Hallo, das ist mein automatisch erzeugtes Video." \
+  --audio-out output/audio.mp3 \
+  --alignment-out output/alignment.json
+```
+
+Then render the avatar:
 
 ```bash
 python render_avatar.py \
-  --audio input/audio.mp3 \
-  --alignment input/alignment.json \
-  --background 111111 \
+  --audio output/audio.mp3 \
+  --alignment output/alignment.json \
+  --avatar avatar.png \
   --output output/avatar.mp4
 ```
+
+This uses ElevenLabs' timestamp-producing TTS endpoint once, so the same TTS audio and timing data are used for the animation. No speech recognition or video generation is performed by this repository.
 
 ## How the mouth mapping works
 
@@ -96,26 +115,26 @@ U / Ü   -> mouth_U
 all other characters -> mouth_neutral
 ```
 
-This is intentionally simple and deterministic. Add dedicated `mouth_E.png` and update `CHAR_TO_MOUTH` in `render_avatar.py` later if you want a more natural result.
+This is intentionally simple and deterministic. Add a dedicated `mouth_E.png` later and update `CHAR_TO_MOUTH` if you want more accurate phoneme coverage.
 
-## Recommended automation
-
-For your end-to-end pipeline, generate TTS through ElevenLabs' timestamps endpoint rather than creating a plain MP3 first and then trying to rediscover timing from the audio. Save both outputs:
+## Full automation
 
 ```text
+LLM
+ ↓
 text
-  ↓
+ ↓
 ElevenLabs /with-timestamps
-  ├── audio.mp3
-  └── alignment.json
-            ↓
-   render_avatar.py
-            ↓
-        avatar.mp4
+ ├── audio.mp3
+ └── alignment.json
+         ↓
+  render_avatar.py
+         ↓
+     avatar.mp4
 ```
 
-That keeps the lip-sync stage free from speech-recognition or video-generation models.
+The only external generation step is your TTS. The avatar animation and MP4 rendering are local and deterministic.
 
 ## Transparency note
 
-H.264 MP4 does not preserve an alpha channel in the normal `yuv420p` workflow used here, so the generated MP4 has an opaque background. If the final editor needs a transparent avatar overlay, use a WebM/VP9 or ProRes 4444 render path instead of H.264 MP4.
+H.264 MP4 does not preserve an alpha channel in the normal `yuv420p` workflow used here, so the generated MP4 has an opaque background. For a later B-roll compositing step where you need a transparent avatar, a WebM/VP9 or ProRes 4444 output is the better intermediate format.
